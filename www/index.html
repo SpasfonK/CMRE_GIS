@@ -300,7 +300,24 @@ button{font-family:inherit;}
     </svg>
   </button>
 </div>
-
+<div id="pkBadge" style="display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px)+96px);z-index:900;background:#0b2e45;color:#fff;padding:10px 18px;border-radius:24px;font-weight:800;font-size:16px;box-shadow:0 4px 14px rgba(0,0,0,.35);white-space:nowrap;">
+  <span id="pkBadgeText">PK —</span>
+</div>
+   <div id="waterLevelsModal" style="position:fixed;inset:0;z-index:2000;background:rgba(6,20,30,.6);display:none;align-items:flex-end;justify-content:center;">
+  <div style="background:#fff;width:100%;max-width:520px;border-radius:20px 20px 0 0;padding:0 0 calc(env(safe-area-inset-bottom,0px)+16px) 0;max-height:80vh;overflow-y:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 18px 8px 18px;">
+      <h2 style="font-size:19px;margin:0;font-weight:800;">Niveaux d'eau</h2>
+      <button id="waterLevelsClose" style="width:40px;height:40px;border-radius:50%;border:none;background:#eef2f4;color:#5b6b73;font-size:18px;">✕</button>
+    </div>
+    <div id="waterLevelsList" style="padding:0 12px;"></div>
+    <div style="padding:12px 18px 4px 18px;">
+      <button id="waterLevelsRefresh" style="width:100%;min-height:48px;border:none;border-radius:12px;background:#0b2e45;color:#fff;font-weight:700;font-size:15px;">Actualiser</button>
+    </div>
+    <div style="padding:8px 18px 0 18px;font-size:11.5px;color:#5b6b73;">
+      Source : API Hub'Eau (hubeau.eaufrance.fr) — mise à jour toutes les 15 minutes en réseau disponible.
+    </div>
+  </div>
+</div>
 <!-- ============ BOTTOM SHEET (fiche ouvrage) ============ -->
 <div id="bottomSheet">
   <div id="sheetHandleZone"><div id="sheetHandle"></div></div>
