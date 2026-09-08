@@ -14,6 +14,9 @@ const required = [
   'data/communes.geojson',
   'vnfDataset.js',
   'data/VNF_NordEst_Rhin_dataset.json',
+  'syncCache.js',
+  'hubEauService.js',
+  'pkProjector.js',
 ];
 
 let missing = [];
