@@ -522,7 +522,15 @@ safeSetup("Chargement segmentation VNF", function () {
   nSeg = loadVnfSegmentation(detSeg.fc);
   if (!detSeg.fc || nSeg === 0) throw new Error(detSeg.fc ? "0 element charge" : "variable introuvable");
 });
-
+safeSetup("Construction de l'index PK (projection GPS)", function () {
+  if (!window.PKProjector) throw new Error("pkProjector.js non charge");
+  const count = window.PKProjector.build(detSeg.fc, {
+    fpkh: function (p) { return getTag(p, VKEYS.fpkh); },
+    tpkh: function (p) { return getTag(p, VKEYS.tpkh); },
+    voie: function (p) { return getTag(p, VKEYS.voie) || "Voie inconnue"; }
+  });
+  if (count === 0) throw new Error("Aucun segment PK indexe (donnees FPKH/TPKH absentes ?)");
+});
 safeSetup("Ajout des couches sur la carte", function () {
   Object.keys(layers).forEach(function (k) { layers[k].addTo(map); });
   const b = layers.waterwaysNav.getBounds();
@@ -864,6 +872,19 @@ function placeGeoMarker(lat, lng, accuracy) {
   const latlng = [lat, lng];
   if (!geoMarker) geoMarker = L.marker(latlng, { icon: L.divIcon({ className: "vnf-icon", html: "<div class=\"pulse-dot\"></div>", iconSize: [14, 14], iconAnchor: [7, 7] }) }).addTo(map);
   else geoMarker.setLatLng(latlng);
+    if (window.PKProjector) {
+    const pkResult = window.PKProjector.findNearestPK(lat, lng, 120);
+    const badge = document.getElementById("pkBadge");
+    const badgeText = document.getElementById("pkBadgeText");
+    if (badge && badgeText) {
+      if (pkResult) {
+        badgeText.textContent = (pkResult.approx ? "≈ " : "") + "PK " + pkResult.pk.toFixed(2) + " — " + pkResult.voie;
+        badge.style.display = "block";
+      } else {
+        badge.style.display = "none";
+      }
+    }
+  }
   if (accuracy) {
     if (!geoCircle) geoCircle = L.circle(latlng, { radius: accuracy, color: "#1e88e5", weight: 1, fillOpacity: 0.12 }).addTo(map);
     else { geoCircle.setLatLng(latlng); geoCircle.setRadius(accuracy); }
@@ -928,7 +949,73 @@ safeSetup("Initialisation zoom personnalise", function () {
   zoomInBtn.addEventListener("click", function () { map.zoomIn(); });
   zoomOutBtn.addEventListener("click", function () { map.zoomOut(); });
 });
+const WATER_STATIONS = [
+  { code: "A701061001", label: "Moselle a Custines", sub: "Moselle canalisee - Metz-Custines" },
+  { code: "A692101001", label: "Meurthe a Laneuveville-devant-Nancy", sub: "Proche chaine des 13 ecluses de Laneuveville" }
+];
 
+function waterLevelRowHtml(station, state) {
+  const badgeColor = state.badge === "live" ? "#2ecc71" : (state.badge === "stale" ? "#e67e22" : "#7f8c8d");
+  const badgeText = state.badge === "live" ? "EN DIRECT" : (state.badge === "stale" ? "DONNEE ANCIENNE" : "INDISPONIBLE");
+  return "<div class=\"wl-row\" data-code=\"" + station.code + "\">" +
+    "<div class=\"wl-info\"><div class=\"wl-label\">" + escapeHtml(station.label) + "</div><div class=\"wl-sub\">" + escapeHtml(station.sub) + "</div></div>" +
+    "<div class=\"wl-value\">" + escapeHtml(state.text) + "</div>" +
+    "<div class=\"wl-badge\" style=\"background:" + badgeColor + "\">" + badgeText + "</div>" +
+  "</div>";
+}
+
+function renderWaterLevelRow(listEl, station, state) {
+  const row = listEl.querySelector("[data-code=\"" + station.code + "\"]");
+  if (!row) return;
+  row.outerHTML = waterLevelRowHtml(station, state);
+}
+
+function loadWaterLevels(listEl) {
+  listEl.innerHTML = WATER_STATIONS.map(function (s) {
+    return waterLevelRowHtml(s, { text: "Chargement...", badge: "loading" });
+  }).join("");
+
+  WATER_STATIONS.forEach(function (s) {
+    window.HubEauService.getHauteurEauStation(s.code)
+      .then(function (r) {
+        if (!r.ok) {
+          renderWaterLevelRow(listEl, s, { text: "Indisponible", badge: "unavailable" });
+          return;
+        }
+        const heightText = r.hauteurM.toFixed(2) + " m";
+        const badge = (r.source === "network" || r.source === "cache-fresh") ? "live" : (r.fiable ? "live" : "stale");
+        const ageInfo = (r.source === "network") ? "" : (" (il y a " + Math.round(r.ageMs / 60000) + " min)");
+        renderWaterLevelRow(listEl, s, { text: heightText + ageInfo, badge: badge });
+      })
+      .catch(function (e) {
+        console.error("[waterLevels]", s.code, e);
+        renderWaterLevelRow(listEl, s, { text: "Erreur", badge: "unavailable" });
+      });
+  });
+}
+
+safeSetup("Panneau niveaux d'eau", function () {
+  const btn = document.getElementById("waterLevelsBtn");
+  const modal = document.getElementById("waterLevelsModal");
+  const modalClose = document.getElementById("waterLevelsClose");
+  const list = document.getElementById("waterLevelsList");
+  const refreshBtn = document.getElementById("waterLevelsRefresh");
+  if (!btn || !modal || !modalClose || !list || !refreshBtn) throw new Error("elements DOM niveaux d'eau manquants");
+
+  btn.addEventListener("click", function () {
+    modal.classList.add("show");
+    modal.style.display = "flex";
+    loadWaterLevels(list);
+  });
+  modalClose.addEventListener("click", function () { modal.style.display = "none"; });
+  modal.addEventListener("click", function (e) { if (e.target === modal) modal.style.display = "none"; });
+  refreshBtn.addEventListener("click", function () {
+    WATER_STATIONS.forEach(function (s) {
+      try { localStorage.removeItem("syncCache_hubeau_" + s.code); } catch (e) {}
+    });
+    loadWaterLevels(list);
+  });
+});
 renderDiagBanner();
 document.title = BUILD_ID;
 showToast(BUILD_ID + " - " + n2 + " lignes, " + n3 + " points, " + nSeg + " segments VNF", 6000);
